@@ -1,0 +1,7 @@
+{
+  "name": "server",
+  "description": "Basic server function",
+  "version": "1.0.0",
+  "runtime": "deno",
+  "entrypoint": "index.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "make-server",
+  "description": "Workday Calculator API Server",
+  "version": "1.0.0",
+  "runtime": "deno",
+  "entrypoint": "index.ts"
+}
