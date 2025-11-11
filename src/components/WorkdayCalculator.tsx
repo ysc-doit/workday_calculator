@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
+import { Switch } from './ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Calendar as CalendarComponent } from './ui/calendar'
@@ -14,14 +15,19 @@ import { zhTW } from 'date-fns/locale'
 import { toast } from 'sonner@2.0.3'
 import { CustomDayWithId, CustomDay } from '../types/workday'
 import { 
+  calculateWorkdaysInRange, 
   calculateWorkdaysWithDetails,
   calculateWorkHoursInRange,
   calculateEndDateFromDays,
+  loadCustomDaysFromStorage, 
   loadAllCustomDays,
+  saveCustomDaysToStorage,
   formatWorkTime,
   WorkdayCalculationDetails
 } from '../utils/workday-helpers'
+import { DirectMergeButton } from './DirectMergeButton'
 
+import { CustomDayForm } from './CustomDayForm'
 import { WorkdayCalculationDetailsComponent } from './WorkdayCalculationDetails'
 
 interface WorkdayCalculatorProps {
@@ -75,6 +81,19 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
       setWorkdayCount(null)
       setCalculationDetails(null)
       onCalculationClear?.()
+    }
+  }
+
+  // 密碼驗證函數
+  const handlePasswordSubmit = () => {
+    const correctPassword = '3721'
+    if (passwordInput === correctPassword) {
+      setIsAuthenticated(true)
+      setPasswordError('')
+      toast('✅ 密碼驗證成功')
+    } else {
+      setPasswordError('密碼錯誤，請重新輸入')
+      setPasswordInput('')
     }
   }
 
@@ -275,6 +294,86 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
       onCardClick?.('workHours')
     }
   }
+
+  const addCustomDay = () => {
+    if (!newCustomDate || !newCustomName) {
+      toast.error('請填寫完整資訊')
+      return
+    }
+
+    if (!isAuthenticated) {
+      toast.error('請先驗證密碼')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const newDay: CustomDay = {
+        date: newCustomDate,
+        type: newCustomType,
+        name: newCustomName
+      }
+
+      const dayWithId: CustomDayWithId = {
+        ...newDay,
+        id: newCustomDate,
+        updatedAt: new Date().toISOString()
+      }
+      
+      // 載入當前全局設定
+      const globalDays = loadCustomDaysFromStorage()
+      const existingIndex = globalDays.findIndex(d => d.date === newCustomDate)
+      const updatedGlobalDays = existingIndex >= 0
+        ? globalDays.map((d, i) => i === existingIndex ? dayWithId : d)
+        : [...globalDays, dayWithId]
+      
+      // 儲存到全局設定
+      saveCustomDaysToStorage(updatedGlobalDays)
+      
+      // 重新載入設定
+      loadCustomDays()
+      clearCalculationResults()
+      
+      setNewCustomDate('')
+      setNewCustomName('')
+      toast.success('✅ 已儲存到全局設定')
+    } catch (error) {
+      console.error('儲存自訂設定失敗:', error)
+      toast.error('儲存失敗，請重試')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const removeCustomDay = (date: string) => {
+    if (!isAuthenticated) {
+      toast.error('請先驗證密碼')
+      return
+    }
+
+    setLoading(true)
+    try {
+      // 載入當前全局設定並刪除指定日期
+      const globalDays = loadCustomDaysFromStorage()
+      const updatedGlobalDays = globalDays.filter(d => d.date !== date)
+      
+      // 儲存更新後的全局設定
+      saveCustomDaysToStorage(updatedGlobalDays)
+      
+      // 重新載入設定
+      loadCustomDays()
+      clearCalculationResults()
+      
+      toast.success('✅ 已從全局設定中刪除')
+    } catch (error) {
+      console.error('刪除自訂設定失敗:', error)
+      toast.error('刪除失敗，請重試')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
 
   const formatTime = (time: string) => {
     return time.substring(0, 5) // 取前5個字元 HH:MM
