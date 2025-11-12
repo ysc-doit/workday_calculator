@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Calendar as CalendarComponent } from './ui/calendar'
 import { Calendar, Hash, Clock, CalendarIcon } from 'lucide-react'
-import { parseISO, format } from 'date-fns'
+import { parseISO, format, addDays } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import { toast } from 'sonner@2.0.3'
 import { CustomDayWithId, CustomDay } from '../types/workday'
@@ -31,7 +31,7 @@ import { CustomDayForm } from './CustomDayForm'
 import { WorkdayCalculationDetailsComponent } from './WorkdayCalculationDetails'
 
 interface WorkdayCalculatorProps {
-  onCalculationUpdate?: (startDate: string, endDate: string, details: WorkdayCalculationDetails, startTime?: string, endTime?: string, mode?: 'inputDays' | 'inputRange' | 'calculateHours', type?: 'workdays' | 'calendarDays') => void
+  onCalculationUpdate?: (startDate: string, endDate: string, details: WorkdayCalculationDetails, startTime?: string, endTime?: string, mode?: 'inputDays' | 'inputRange' | 'calculateHours', type?: 'workdays' | 'calendarDays', cardType?: string, inclusionMode?: 'current' | 'next') => void
   onCalculationClear?: () => void
   onCardClick?: (cardType: string) => void
   selectedCardType?: string
@@ -45,6 +45,7 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
   const [endTime, setEndTime] = useState('')
   const [durationDays, setDurationDays] = useState('')
   const [durationUnit, setDurationUnit] = useState<'workdays' | 'calendar'>('workdays')
+  const [startDateInclusionMode, setStartDateInclusionMode] = useState<'current' | 'next'>('current')
   const [customDays, setCustomDays] = useState<CustomDayWithId[]>([])
   const [newCustomDate, setNewCustomDate] = useState('')
   const [newCustomName, setNewCustomName] = useState('')
@@ -53,11 +54,6 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
   const [calculationDetails, setCalculationDetails] = useState<WorkdayCalculationDetails | null>(null)
 
   const [loading, setLoading] = useState(false)
-  
-  // 密碼驗證狀態
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [passwordInput, setPasswordInput] = useState('')
-  const [passwordError, setPasswordError] = useState('')
   
   // 日曆彈窗狀態
   const [startDatePickerOpen, setStartDatePickerOpen] = useState(false)
@@ -84,19 +80,6 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
     }
   }
 
-  // 密碼驗證函數
-  const handlePasswordSubmit = () => {
-    const correctPassword = '3721'
-    if (passwordInput === correctPassword) {
-      setIsAuthenticated(true)
-      setPasswordError('')
-      toast('✅ 密碼驗證成功')
-    } else {
-      setPasswordError('密碼錯誤，請重新輸入')
-      setPasswordInput('')
-    }
-  }
-
   const loadCustomDays = useCallback(() => {
     // 載入全局自訂日期設定
     try {
@@ -105,7 +88,7 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
       setCustomDays(allDays)
       
       if (allDays.length > 0) {
-        console.log(`📅 已載入 ${allDays.length} 個全局設定`)
+        console.log(`📅 已載入 ${allDays.length} 個日期設定`)
       }
     } catch (error) {
       console.error('載入自訂設定失敗:', error)
@@ -166,6 +149,26 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
     }
   }, [endDatePickerOpen])
 
+  // 自動計算
+  useEffect(() => {
+    if (calculationMode === 'range') {
+      // 輸入期間模式：當開始和結束日期都有值時自動計算
+      if (startDate && endDate) {
+        calculateWorkdays(true)
+      }
+    } else if (calculationMode === 'duration') {
+      // 輸入天數模式：當開始日期和天數都有值時自動計算
+      if (startDate && durationDays && parseInt(durationDays) > 0) {
+        calculateWorkdays(true)
+      }
+    } else if (calculationMode === 'workhours') {
+      // 計算工時模式：當日期和時間都有值時自動計算
+      if (startDate && endDate && startTime && endTime) {
+        calculateWorkdays(true)
+      }
+    }
+  }, [calculationMode, startDate, endDate, durationDays, durationUnit, startDateInclusionMode, startTime, endTime, customDays])
+
   const validateTimeInput = (): boolean => {
     if (calculationMode !== 'workhours') return true
     
@@ -195,11 +198,11 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
     return true
   }
 
-  const calculateWorkdays = () => {
+  const calculateWorkdays = (silent: boolean = false) => {
     if (calculationMode === 'range') {
       // 計日期範圍
       if (!startDate || !endDate) {
-        toast.error('請選擇開始和結束日期')
+        if (!silent) toast.error('請選擇開始和結束日期')
         return
       }
 
@@ -207,30 +210,27 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
       const end = parseISO(endDate)
       
       if (start > end) {
-        toast.error('開始日期不能晚於結束日期')
+        if (!silent) toast.error('開始日期不能晚於結束日期')
         return
       }
 
       const details = calculateWorkdaysWithDetails(startDate, endDate, customDays)
-      toast.success(`計算完成：${details.workdays} 個工作天`)
+      if (!silent) toast.success(`計算完成：${details.workdays} 個工作天`)
       
       setWorkdayCount(details.workdays)
       setCalculationDetails(details)
       
-      // 通知 App 組件計算結果
-      onCalculationUpdate?.(startDate, endDate, details, undefined, undefined, 'inputRange')
-      
-      // 「輸入期間」預設選擇工作天卡片
-      onCardClick?.('workdays')
+      // 通知 App 組件計算結果，並傳遞預設卡片類型
+      onCalculationUpdate?.(startDate, endDate, details, undefined, undefined, 'inputRange', undefined, 'workdays')
     } else if (calculationMode === 'duration') {
       // 天數計算結束日期
       if (!startDate) {
-        toast.error('請選擇開始日期')
+        if (!silent) toast.error('請選擇開始日期')
         return
       }
 
       if (!durationDays || parseInt(durationDays) <= 0) {
-        toast.error('請輸入有效的天數')
+        if (!silent) toast.error('請輸入有效的天數')
         return
       }
 
@@ -239,26 +239,30 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
         startDate,
         days,
         durationUnit === 'workdays',
-        customDays
+        customDays,
+        startDateInclusionMode === 'current'
       )
       
       setEndDate(calculatedEndDate)
       
-      const details = calculateWorkdaysWithDetails(startDate, calculatedEndDate, customDays)
-      toast.success(`計算完成：結束日期為 ${calculatedEndDate}，${details.workdays} 個工作天`)
+      // 如果是次日起算，詳細資訊應從次日開始計算
+      const detailsStartDate = startDateInclusionMode === 'next' 
+        ? format(addDays(parseISO(startDate), 1), 'yyyy-MM-dd')
+        : startDate
+      
+      const details = calculateWorkdaysWithDetails(detailsStartDate, calculatedEndDate, customDays)
+      if (!silent) toast.success(`計算完成：結束日期為 ${calculatedEndDate}，${details.workdays} 個工作天`)
       
       setWorkdayCount(details.workdays)
       setCalculationDetails(details)
       
-      // 通知 App 組件計算結果
-      onCalculationUpdate?.(startDate, calculatedEndDate, details, undefined, undefined, 'inputDays', durationUnit === 'workdays' ? 'workdays' : 'calendarDays')
-      
-      // 「輸入天數」根據期間設定選擇對應卡片
-      onCardClick?.(durationUnit === 'workdays' ? 'workdays' : 'totalDays')
+      // 通知 App 組件計算結果，並傳遞預設卡片類型和起算方式
+      const cardType = durationUnit === 'workdays' ? 'workdays' : 'totalDays'
+      onCalculationUpdate?.(detailsStartDate, calculatedEndDate, details, undefined, undefined, 'inputDays', durationUnit === 'workdays' ? 'workdays' : 'calendarDays', cardType, startDateInclusionMode)
     } else {
       // 計算工作時數
       if (!startDate || !endDate) {
-        toast.error('請選擇開始和結束日期時間')
+        if (!silent) toast.error('請選擇開始和結束日期時間')
         return
       }
 
@@ -266,12 +270,29 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
       const end = parseISO(endDate)
       
       if (start > end) {
-        toast.error('開始日期不能晚於結束日期')
+        if (!silent) toast.error('開始日期不能晚於結束日期')
         return
       }
 
-      if (!validateTimeInput()) {
-        return
+      // 靜默模式下，如果時間未完整輸入則返回
+      if (silent) {
+        const startTimeParts = parseTime(startTime)
+        const endTimeParts = parseTime(endTime)
+        if (!startTimeParts.hour || !startTimeParts.minute || !endTimeParts.hour || !endTimeParts.minute) {
+          return
+        }
+        // 同一天時檢查時間是否合理
+        if (startDate === endDate) {
+          const completeStartTime = `${startTimeParts.hour}:${startTimeParts.minute}`
+          const completeEndTime = `${endTimeParts.hour}:${endTimeParts.minute}`
+          if (completeStartTime >= completeEndTime) {
+            return
+          }
+        }
+      } else {
+        if (!validateTimeInput()) {
+          return
+        }
       }
 
       const details = calculateWorkHoursInRange(
@@ -282,27 +303,19 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
         customDays
       )
       const timeText = formatWorkTime(details.workHours || 0, details.workMinutes || 0)
-      toast.success(`計算完成：${details.workdays} 個工作天，${timeText}`)
+      if (!silent) toast.success(`計算完成：${details.workdays} 個工作天，${timeText}`)
       
       setWorkdayCount(details.workdays)
       setCalculationDetails(details)
       
-      // 通知 App 組件計算結果
-      onCalculationUpdate?.(startDate, endDate, details, startTime, endTime, 'calculateHours')
-      
-      // 「計算工時」預設選擇工作時數卡片
-      onCardClick?.('workHours')
+      // 通知 App 組件計算結果，並傳遞預設卡片類型
+      onCalculationUpdate?.(startDate, endDate, details, startTime, endTime, 'calculateHours', undefined, 'workHours')
     }
   }
 
   const addCustomDay = () => {
     if (!newCustomDate || !newCustomName) {
       toast.error('請填寫完整資訊')
-      return
-    }
-
-    if (!isAuthenticated) {
-      toast.error('請先驗證密碼')
       return
     }
 
@@ -320,15 +333,15 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
         updatedAt: new Date().toISOString()
       }
       
-      // 載入當前全局設定
-      const globalDays = loadCustomDaysFromStorage()
-      const existingIndex = globalDays.findIndex(d => d.date === newCustomDate)
-      const updatedGlobalDays = existingIndex >= 0
-        ? globalDays.map((d, i) => i === existingIndex ? dayWithId : d)
-        : [...globalDays, dayWithId]
+      // 載入當前設定
+      const currentDays = loadCustomDaysFromStorage()
+      const existingIndex = currentDays.findIndex(d => d.date === newCustomDate)
+      const updatedDays = existingIndex >= 0
+        ? currentDays.map((d, i) => i === existingIndex ? dayWithId : d)
+        : [...currentDays, dayWithId]
       
-      // 儲存到全局設定
-      saveCustomDaysToStorage(updatedGlobalDays)
+      // 儲存設定
+      saveCustomDaysToStorage(updatedDays)
       
       // 重新載入設定
       loadCustomDays()
@@ -336,7 +349,7 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
       
       setNewCustomDate('')
       setNewCustomName('')
-      toast.success('✅ 已儲存到全局設定')
+      toast.success('✅ 已儲存自訂日期')
     } catch (error) {
       console.error('儲存自訂設定失敗:', error)
       toast.error('儲存失敗，請重試')
@@ -346,25 +359,20 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
   }
 
   const removeCustomDay = (date: string) => {
-    if (!isAuthenticated) {
-      toast.error('請先驗證密碼')
-      return
-    }
-
     setLoading(true)
     try {
-      // 載入當前全局設定並刪除指定日期
-      const globalDays = loadCustomDaysFromStorage()
-      const updatedGlobalDays = globalDays.filter(d => d.date !== date)
+      // 載入當前設定並刪除指定日期
+      const currentDays = loadCustomDaysFromStorage()
+      const updatedDays = currentDays.filter(d => d.date !== date)
       
-      // 儲存更新後的全局設定
-      saveCustomDaysToStorage(updatedGlobalDays)
+      // 儲存更新後的設定
+      saveCustomDaysToStorage(updatedDays)
       
       // 重新載入設定
       loadCustomDays()
       clearCalculationResults()
       
-      toast.success('✅ 已從全局設定中刪除')
+      toast.success('✅ 已刪除自訂日期')
     } catch (error) {
       console.error('刪除自訂設定失敗:', error)
       toast.error('刪除失敗，請重試')
@@ -453,7 +461,7 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
     return null
   }
 
-  // 同步日期選擇到輸入框
+  // 同步日���選擇到輸入框
   const updateDateInput = (date: string, isStartDate: boolean) => {
     if (date) {
       const formatted = format(parseISO(date), 'yyyy/MM/dd')
@@ -553,46 +561,57 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
     <div className="space-y-8">
       {/* 工作天計算機主要功能 */}
       <Card>
-        <CardContent className="space-y-8 px-[21px] py-[26px]">
+        <CardContent className="space-y-8 pt-[26px] pr-[21px] pb-[21px] pl-[21px] mx-[0px] my-[5px]">
           {/* 區塊一：計算方式選擇 */}
           <div>
-            <div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-                <Button
-                  variant={calculationMode === 'duration' ? 'default' : 'outline'}
-                  onClick={() => {
-                    setCalculationMode('duration')
-                    clearCalculationResults()
-                  }}
-                  className="h-auto py-3 px-4 flex flex-col items-center gap-1"
-                >
-                  <Hash className={`w-4 h-4 ${calculationMode === 'duration' ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
-                  <span className="text-sm">輸入天數</span>
-                </Button>
-                <Button
-                  variant={calculationMode === 'range' ? 'default' : 'outline'}
-                  onClick={() => {
-                    setCalculationMode('range')
-                    clearCalculationResults()
-                  }}
-                  className="h-auto py-3 px-4 flex flex-col items-center gap-1"
-                >
-                  <Calendar className={`w-4 h-4 ${calculationMode === 'range' ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
-                  <span className="text-sm">輸入期間</span>
-                </Button>
-                <Button
-                  variant={calculationMode === 'workhours' ? 'default' : 'outline'}
-                  onClick={() => {
-                    setCalculationMode('workhours')
-                    clearCalculationResults()
-                  }}
-                  className="h-auto py-3 px-4 flex flex-col items-center gap-1"
-                >
-                  <Clock className={`w-4 h-4 ${calculationMode === 'workhours' ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
-                  <span className="text-sm">計算工時</span>
-                </Button>
-              </div>
-
+            <div className="inline-flex rounded-md border border-border bg-input-background overflow-hidden w-full">
+              <button
+                type="button"
+                className={`text-sm flex-1 py-3 px-4 flex flex-col items-center justify-center gap-1 transition-colors hover:bg-accent ${
+                  calculationMode === 'duration'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'bg-transparent text-foreground'
+                }`}
+                onClick={() => {
+                  setCalculationMode('duration')
+                  clearCalculationResults()
+                }}
+              >
+                <Hash className="w-4 h-4" />
+                <span>輸入天數</span>
+              </button>
+              <div className="w-px bg-border" />
+              <button
+                type="button"
+                className={`text-sm flex-1 py-3 px-4 flex flex-col items-center justify-center gap-1 transition-colors hover:bg-accent ${
+                  calculationMode === 'range'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'bg-transparent text-foreground'
+                }`}
+                onClick={() => {
+                  setCalculationMode('range')
+                  clearCalculationResults()
+                }}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>輸入期間</span>
+              </button>
+              <div className="w-px bg-border" />
+              <button
+                type="button"
+                className={`text-sm flex-1 py-3 px-4 flex flex-col items-center justify-center gap-1 transition-colors hover:bg-accent ${
+                  calculationMode === 'workhours'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'bg-transparent text-foreground'
+                }`}
+                onClick={() => {
+                  setCalculationMode('workhours')
+                  clearCalculationResults()
+                }}
+              >
+                <Clock className="w-4 h-4" />
+                <span>計算工時</span>
+              </button>
             </div>
           </div>
 
@@ -600,7 +619,10 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
           <div className="p-4 bg-muted/30 rounded-lg space-y-4">
             {/* 開始日期時間 */}
             <div className="space-y-2">
-              <Label className="text-sm">開始日期{calculationMode === 'workhours' && '時間'}</Label>
+              <Label className="text-sm">
+                {calculationMode === 'range' ? '開始日期' : '輸入日期'}
+                {calculationMode === 'workhours' && '時間'}
+              </Label>
               <div className="flex gap-2">
                 <div className="flex-1">
                   <Popover open={startDatePickerOpen} onOpenChange={setStartDatePickerOpen}>
@@ -618,9 +640,11 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
                       >
                         <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
                         {startDate ? (
-                          <span>{format(parseISO(startDate), 'yyyy/MM/dd')}</span>
+                          <span className={calculationMode === 'duration' ? 'flex-1 text-center pr-[170px]' : ''}>{format(parseISO(startDate), 'yyyy/MM/dd')}</span>
                         ) : (
-                          <span className="text-muted-foreground">選擇開始日期</span>
+                          <span className="text-muted-foreground">
+                            {calculationMode === 'range' ? '選擇開始日期' : '輸入日期'}
+                          </span>
                         )}
                       </Button>
                     </PopoverTrigger>
@@ -732,6 +756,39 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
                         </div>
                       </PopoverContent>
                     </Popover>
+                  </div>
+                )}
+                {calculationMode === 'duration' && (
+                  <div className="inline-flex rounded-md border border-border bg-input-background h-10 overflow-hidden w-[145px]">
+                    <button
+                      type="button"
+                      className={`text-sm w-[72px] h-10 flex items-center justify-center transition-colors hover:bg-accent ${
+                        startDateInclusionMode === 'current'
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                          : 'bg-transparent text-foreground'
+                      }`}
+                      onClick={() => {
+                        setStartDateInclusionMode('current')
+                        clearCalculationResults()
+                      }}
+                    >
+                      當日起算
+                    </button>
+                    <div className="w-px bg-border" />
+                    <button
+                      type="button"
+                      className={`text-sm w-[72px] h-10 flex items-center justify-center transition-colors hover:bg-accent ${
+                        startDateInclusionMode === 'next'
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                          : 'bg-transparent text-foreground'
+                      }`}
+                      onClick={() => {
+                        setStartDateInclusionMode('next')
+                        clearCalculationResults()
+                      }}
+                    >
+                      次日起算
+                    </button>
                   </div>
                 )}
               </div>
@@ -871,7 +928,7 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
                 <div className="space-y-2">
                   <Label className="text-sm">輸入天數</Label>
                   <div className="flex gap-2">
-                    <div className="flex-1">
+                    <div className="flex-1 relative">
                       <Input
                         type="number"
                         min="1"
@@ -880,25 +937,87 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
                           setDurationDays(e.target.value)
                           clearCalculationResults()
                         }}
-                        className="w-full bg-input-background min-h-10 px-3 py-2"
+                        className={`w-full bg-input-background border-border min-h-10 py-2 pr-[170px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                          durationDays ? 'pl-12' : 'pl-3'
+                        }`}
                       />
+                      {durationDays && (
+                        <div className="absolute left-2 top-1/2 -translate-y-1/2">
+                          <button
+                            type="button"
+                            className="w-7 h-7 flex items-center justify-center text-sm rounded hover:bg-muted/50 transition-colors text-muted-foreground"
+                            onClick={() => {
+                              const current = parseInt(durationDays) || 1
+                              if (current > 1) {
+                                setDurationDays((current - 1).toString())
+                                clearCalculationResults()
+                              }
+                            }}
+                          >
+                            -
+                          </button>
+                        </div>
+                      )}
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center">
+                        {durationDays && (
+                          <button
+                            type="button"
+                            className="w-7 h-7 flex items-center justify-center text-sm rounded hover:bg-muted/50 transition-colors text-muted-foreground"
+                            onClick={() => {
+                              const current = parseInt(durationDays) || 0
+                              setDurationDays((current + 1).toString())
+                              clearCalculationResults()
+                            }}
+                          >
+                            +
+                          </button>
+                        )}
+                        <div className="w-px h-5 bg-border mx-0.5" />
+                        {[5, 10, 15, 20].map((days) => (
+                          <button
+                            key={days}
+                            type="button"
+                            className="w-7 h-6 flex items-center justify-center text-xs rounded hover:bg-muted/50 transition-colors text-muted-foreground"
+                            onClick={() => {
+                              setDurationDays(days.toString())
+                              clearCalculationResults()
+                            }}
+                          >
+                            {days}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="w-32 print:bg-white">
-                      <Select 
-                        value={durationUnit} 
-                        onValueChange={(value: 'workdays' | 'calendar') => {
-                          setDurationUnit(value)
+                    <div className="inline-flex rounded-md border border-border bg-input-background h-10 overflow-hidden w-[145px] print:!bg-white print:!border-gray-300">
+                      <button
+                        type="button"
+                        className={`text-sm w-[72px] h-10 flex items-center justify-center transition-colors hover:bg-accent print:!hover:bg-gray-100 ${
+                          durationUnit === 'workdays'
+                            ? 'bg-primary text-primary-foreground hover:bg-primary/90 print:!bg-gray-200 print:!text-black'
+                            : 'bg-transparent text-foreground print:!bg-white print:!text-black'
+                        }`}
+                        onClick={() => {
+                          setDurationUnit('workdays')
                           clearCalculationResults()
                         }}
                       >
-                        <SelectTrigger className="min-h-10 px-3 py-2 print:!bg-white print:!text-black print:!border-gray-300 print:shadow-none">
-                          <SelectValue className="print:!text-black" />
-                        </SelectTrigger>
-                        <SelectContent className="print:!bg-white print:!text-black print:!border-gray-300 print:shadow-none">
-                          <SelectItem value="workdays" className="print:!bg-white print:!text-black print:hover:!bg-gray-100 print:focus:!bg-gray-100 print:data-[highlighted]:!bg-gray-100">工作天</SelectItem>
-                          <SelectItem value="calendar" className="print:!bg-white print:!text-black print:hover:!bg-gray-100 print:focus:!bg-gray-100 print:data-[highlighted]:!bg-gray-100">日曆天</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        工作天
+                      </button>
+                      <div className="w-px bg-border print:!bg-gray-300" />
+                      <button
+                        type="button"
+                        className={`text-sm w-[72px] h-10 flex items-center justify-center transition-colors hover:bg-accent print:!hover:bg-gray-100 ${
+                          durationUnit === 'calendar'
+                            ? 'bg-primary text-primary-foreground hover:bg-primary/90 print:!bg-gray-200 print:!text-black'
+                            : 'bg-transparent text-foreground print:!bg-white print:!text-black'
+                        }`}
+                        onClick={() => {
+                          setDurationUnit('calendar')
+                          clearCalculationResults()
+                        }}
+                      >
+                        日曆天
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -906,13 +1025,6 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
             )}
           </div>
 
-          {/* 區塊三：計算按鈕和規則 */}
-          <div>
-            {/* 計算按鈕 */}
-            <Button onClick={calculateWorkdays} className="w-full" size="lg">
-              開始計算
-            </Button>
-          </div>
         </CardContent>
       </Card>
 

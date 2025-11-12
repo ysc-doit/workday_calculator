@@ -38,13 +38,25 @@ interface WorkdayCalendarProps {
   selectedCardType?: string
   calculationMode?: 'inputDays' | 'inputRange' | 'calculateHours'
   calculationType?: 'workdays' | 'calendarDays'
+  inclusionMode?: 'current' | 'next'
 }
 
-export function WorkdayCalendar({ calculationRange, calculationDetails, selectedCardType, calculationMode, calculationType }: WorkdayCalendarProps) {
+export function WorkdayCalendar({ calculationRange, calculationDetails, selectedCardType, calculationMode, calculationType, inclusionMode }: WorkdayCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [customDays, setCustomDays] = useState<CustomDayWithId[]>([])
   const [showSettings, setShowSettings] = useState(false)
   const [selectedYear, setSelectedYear] = useState<string>('')
+
+  // 調試日誌
+  useEffect(() => {
+    console.log('WorkdayCalendar props 更新:', {
+      calculationRange,
+      hasCalculationDetails: !!calculationDetails,
+      selectedCardType,
+      calculationMode,
+      calculationType
+    })
+  }, [calculationRange, calculationDetails, selectedCardType, calculationMode, calculationType])
 
   // 當設定模式開啟時，初始化年份選擇器
   useEffect(() => {
@@ -118,6 +130,11 @@ export function WorkdayCalendar({ calculationRange, calculationDetails, selected
 
   const getDaySequenceNumber = (day: Date): number | null => {
     if (!calculationRange || !calculationDetails || !selectedCardType) {
+      console.log('getDaySequenceNumber 返回 null:', { 
+        hasCalculationRange: !!calculationRange, 
+        hasCalculationDetails: !!calculationDetails, 
+        selectedCardType 
+      })
       return null
     }
     
@@ -246,7 +263,8 @@ export function WorkdayCalendar({ calculationRange, calculationDetails, selected
         selectedCardType,
         customDays,
         calculationMode,
-        calculationType
+        calculationType,
+        inclusionMode
       })
       
       printWindow.document.open()

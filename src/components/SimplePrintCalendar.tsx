@@ -28,6 +28,7 @@ interface SimplePrintCalendarProps {
   customDays: CustomDayWithId[]
   calculationMode?: 'inputDays' | 'inputRange' | 'calculateHours'
   calculationType?: 'workdays' | 'calendarDays'
+  inclusionMode?: 'current' | 'next'
 }
 
 export const generatePrintableHTML = ({
@@ -36,7 +37,8 @@ export const generatePrintableHTML = ({
   selectedCardType,
   customDays,
   calculationMode,
-  calculationType
+  calculationType,
+  inclusionMode
 }: SimplePrintCalendarProps): string => {
   const startDate = parseISO(calculationRange.startDate)
   const endDate = parseISO(calculationRange.endDate)
@@ -139,7 +141,7 @@ export const generatePrintableHTML = ({
   const formatDate = (dateStr: string) => {
     try {
       const date = parseISO(dateStr)
-      return format(date, 'MM/dd (eeeee)', { locale: zhTW })
+      return format(date, 'yyyy/MM/dd (E)', { locale: zhTW })
     } catch {
       return dateStr
     }
@@ -149,170 +151,116 @@ export const generatePrintableHTML = ({
     return time.substring(0, 5)
   }
 
-  // 生成輸入區塊HTML
+  // 生成輸入區塊HTML（簡潔版）
   const generateInputSectionHTML = (): string => {
+    // 當選擇「次日起算」時，startDate 已經是調整後的日期（次日），需要回推一天顯示原始輸入日期
+    const displayStartDate = (calculationMode === 'inputDays' && inclusionMode === 'next') 
+      ? addDays(startDate, -1) 
+      : startDate
+    
     return `
-      <div style="margin-bottom: 12px;">
-        <div style="padding: 6px; background-color: #f8f9fa; border-radius: 4px; margin-bottom: 8px;">
-          <div style="margin-bottom: 6px;">
-            <div style="margin-bottom: 3px; font-weight: 500; font-size: 10px;">
-              開始日期${calculationMode === 'calculateHours' ? '時間' : ''}
-            </div>
-            <div style="display: flex; gap: 4px;">
-              <div style="
-                flex: 1; 
-                padding: 3px 6px; 
-                background-color: white; 
-                border: 1px solid #d1d5db; 
-                border-radius: 3px;
-                font-size: 10px;
-              ">
-                ${format(startDate, 'yyyy/MM/dd')}
-              </div>
-              ${calculationMode === 'calculateHours' && calculationRange.startTime ? `
-                <div style="
-                  width: 50px; 
-                  padding: 3px 6px; 
-                  background-color: white; 
-                  border: 1px solid #d1d5db; 
-                  border-radius: 3px;
-                  font-size: 10px;
-                ">
-                  ${formatTime(calculationRange.startTime)}
-                </div>
-              ` : ''}
-            </div>
+      <div style="margin-bottom: 20px;">
+        ${calculationMode === 'inputDays' ? `
+          <div style="font-size: 16px; color: #1f2937; margin-bottom: 8px;">
+            輸入日期：${format(displayStartDate, 'yyyy/MM/dd')} ${inclusionMode === 'next' ? '次日起算' : '當日起算'}
           </div>
+          <div style="font-size: 16px; color: #1f2937; margin-bottom: 8px;">
+            輸入天數：${calculationType === 'workdays' ? calculationDetails?.workdays || '—' : calculationDetails?.totalDays || '—'} ${calculationType === 'workdays' ? '工作天' : '日曆天'}
+          </div>
+        ` : calculationMode === 'inputRange' ? `
+          <div style="font-size: 16px; color: #1f2937; margin-bottom: 8px;">
+            開始日期：${format(startDate, 'yyyy/MM/dd')}
+          </div>
+          <div style="font-size: 16px; color: #1f2937; margin-bottom: 8px;">
+            結束日期：${format(endDate, 'yyyy/MM/dd')}
+          </div>
+        ` : calculationMode === 'calculateHours' ? `
+          <div style="font-size: 16px; color: #1f2937; margin-bottom: 8px;">
+            開始日期時間：${format(startDate, 'yyyy/MM/dd')}${calculationRange.startTime ? ` ${formatTime(calculationRange.startTime)}` : ''}
+          </div>
+          <div style="font-size: 16px; color: #1f2937; margin-bottom: 8px;">
+            結束日期時間：${format(endDate, 'yyyy/MM/dd')}${calculationRange.endTime ? ` ${formatTime(calculationRange.endTime)}` : ''}
+          </div>
+        ` : ''}
+      </div>
+    `
+  }
 
-          ${(calculationMode === 'inputRange' || calculationMode === 'calculateHours') ? `
-            <div style="margin-bottom: 6px;">
-              <div style="margin-bottom: 3px; font-weight: 500; font-size: 10px;">
-                結束日期${calculationMode === 'calculateHours' ? '時間' : ''}
-              </div>
-              <div style="display: flex; gap: 4px;">
-                <div style="
-                  flex: 1; 
-                  padding: 3px 6px; 
-                  background-color: white; 
-                  border: 1px solid #d1d5db; 
-                  border-radius: 3px;
-                  font-size: 10px;
-                ">
-                  ${format(endDate, 'yyyy/MM/dd')}
-                </div>
-                ${calculationMode === 'calculateHours' && calculationRange.endTime ? `
-                  <div style="
-                    width: 50px; 
-                    padding: 3px 6px; 
-                    background-color: white; 
-                    border: 1px solid #d1d5db; 
-                    border-radius: 3px;
-                    font-size: 10px;
-                  ">
-                    ${formatTime(calculationRange.endTime)}
-                  </div>
-                ` : ''}
-              </div>
-            </div>
-          ` : calculationMode === 'inputDays' ? `
-            <div style="margin-bottom: 6px;">
-              <div style="margin-bottom: 3px; font-weight: 500; font-size: 10px;">輸入天數</div>
-              <div style="display: flex; gap: 4px; align-items: center;">
-                <div style="
-                  flex: 1;
-                  padding: 3px 6px; 
-                  background-color: white; 
-                  border: 1px solid #d1d5db; 
-                  border-radius: 3px;
-                  font-size: 10px;
-                  text-align: center;
-                ">
-                  ${calculationType === 'workdays' ? calculationDetails?.workdays || '—' : calculationDetails?.totalDays || '—'}
-                </div>
-                <div style="
-                  padding: 3px 8px; 
-                  background-color: ${calculationType === 'workdays' ? '#2f3437' : 'white'}; 
-                  border: 1px solid ${calculationType === 'workdays' ? '#2f3437' : '#d1d5db'}; 
-                  border-radius: 3px;
-                  font-size: 10px;
-                  color: ${calculationType === 'workdays' ? 'white' : '#2f3437'};
-                  font-weight: 500;
-                  white-space: nowrap;
-                ">
-                  ${calculationType === 'workdays' ? '工作天' : '日曆天'}
-                </div>
-              </div>
-            </div>
-          ` : ''}
+  // 生成結果區塊HTML（簡潔版）
+  const generateResultSectionHTML = (): string => {
+    if (!calculationDetails) return ''
+
+    return `
+      <div style="margin-bottom: 20px;">
+        <div style="font-size: 16px; color: #1f2937; margin-bottom: 8px;">
+          計算結果：${calculationMode === 'inputDays' && calculationRange.endDate ? formatDate(calculationRange.endDate) :
+            calculationMode === 'inputRange' ? `${calculationDetails.workdays} 個工作天` :
+            calculationMode === 'calculateHours' ? formatWorkTime(calculationDetails.workHours || 0, calculationDetails.workMinutes || 0) :
+            '—'}
         </div>
       </div>
     `
   }
 
-  // 生成結果區塊HTML
-  const generateResultSectionHTML = (): string => {
+  // 生成詳細資訊區塊HTML（保留於日曆下方）
+  const generateDetailsHTML = (): string => {
     if (!calculationDetails) return ''
 
     return `
-      <div style="margin-bottom: 12px;">
-        <div style="margin-bottom: 8px;">
+      <div style="margin-bottom: 32px;">
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <!-- 日曆天 -->
           <div style="
-            padding: 8px; 
-            background-color: #f0f9ff; 
-            border: 2px solid #3b82f6; 
-            border-radius: 4px; 
-            text-align: center;
-            color: #1d4ed8;
-          ">
-            <div style="font-size: 12px; font-weight: bold; margin-bottom: 2px;">
-              ${calculationMode === 'inputDays' && calculationRange.endDate ? formatDate(calculationRange.endDate) :
-                calculationMode === 'inputRange' ? `${calculationDetails.workdays}個工作天` :
-                calculationMode === 'calculateHours' ? formatWorkTime(calculationDetails.workHours || 0, calculationDetails.workMinutes || 0) :
-                '—'}
-            </div>
-            <div style="font-size: 8px; color: #3b82f6;">計算結果</div>
-          </div>
-        </div>
-
-
-
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center;">
-          <div style="
-            padding: 6px; 
+            padding: 8px 16px; 
             background-color: #f8fafc; 
-            border-radius: 4px; 
-            ${selectedCardType === 'totalDays' ? 'border: 1px solid #64748b;' : 'border: 1px solid #e2e8f0;'}
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
           ">
-            <div style="font-size: 11px; font-weight: bold; color: #475569; margin-bottom: 2px;">
+            <span style="font-size: 16px; font-weight: bold; color: #475569;">
               ${calculationDetails.totalDays}
-            </div>
-            <div style="font-size: 8px; color: #64748b;">日曆天</div>
+            </span>
+            <span style="font-size: 13px; color: #64748b;">
+              日曆天
+            </span>
           </div>
+
+          <!-- 工作天 -->
           <div style="
-            padding: 6px; 
+            padding: 8px 16px; 
             background-color: #f0fdf4; 
-            border-radius: 4px; 
-            ${selectedCardType === 'workdays' ? 'border: 1px solid #22c55e;' : 'border: 1px solid #bbf7d0;'}
+            border: 1px solid #bbf7d0;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
           ">
-            <div style="font-size: 11px; font-weight: bold; color: #15803d; margin-bottom: 2px;">
+            <span style="font-size: 16px; font-weight: bold; color: #15803d;">
               ${calculationDetails.workdays}
-            </div>
-            <div style="font-size: 8px; color: #16a34a;">
-              工作天${calculationDetails.customWorkdays > 0 ? '<span style="color: #3b82f6;">(含補班)</span>' : ''}
-            </div>
+            </span>
+            <span style="font-size: 13px; color: #16a34a;">
+              工作天${calculationDetails.customWorkdays > 0 ? '<span style="font-size: 11px;">(含補班)</span>' : ''}
+            </span>
           </div>
+
+          <!-- 假日 -->
           <div style="
-            padding: 6px; 
+            padding: 8px 16px; 
             background-color: #fef2f2; 
-            border-radius: 4px; 
-            ${selectedCardType === 'weekends' || selectedCardType === 'customHolidays' ? 'border: 1px solid #ef4444;' : 'border: 1px solid #fecaca;'}
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
           ">
-            <div style="font-size: 11px; font-weight: bold; color: #dc2626; margin-bottom: 2px;">
+            <span style="font-size: 16px; font-weight: bold; color: #dc2626;">
               ${calculationDetails.holidays}
-            </div>
-            <div style="font-size: 8px; color: #ef4444;">
-              假日${calculationDetails.customHolidays > 0 ? '<span style="color: #f97316;">(含放假)</span>' : ''}
-            </div>
+            </span>
+            <span style="font-size: 13px; color: #ef4444;">
+              假日${calculationDetails.customHolidays > 0 ? '<span style="font-size: 11px;">(含放假)</span>' : ''}
+            </span>
           </div>
         </div>
       </div>
@@ -595,11 +543,13 @@ export const generatePrintableHTML = ({
           }
           body { 
             font-family: Arial, 'Microsoft JhengHei', sans-serif; 
-            line-height: 1.4;
+            line-height: 1.6;
             background-color: white;
-            color: black;
-            padding: 20px;
+            color: #333;
+            padding: 40px;
             font-size: 14px;
+            max-width: 800px;
+            margin: 0 auto;
           }
           * {
             -webkit-print-color-adjust: exact;
@@ -610,21 +560,30 @@ export const generatePrintableHTML = ({
       </head>
       <body>
         <div>
-          <div style="text-align: center; margin-bottom: 16px;">
-            <h1 style="font-size: 18px; font-weight: bold; margin: 0;">
+          <!-- 標題 -->
+          <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="font-size: 24px; font-weight: bold; margin: 0; color: #1f2937;">
               工作天計算機
             </h1>
           </div>
 
+          <!-- 輸入資訊 -->
           ${generateInputSectionHTML()}
 
+          <!-- 計算結果 -->
           ${generateResultSectionHTML()}
 
+          <!-- 詳細統計 -->
+          ${generateDetailsHTML()}
+
+          <!-- 第一個月曆 -->
           ${months.length > 0 ? generateCalendarHTML(months[0], true) : ''}
           
+          <!-- 圖例 -->
           ${generateLegendHTML()}
         </div>
 
+        <!-- 其他月份的日曆 -->
         ${months.length > 1 ? 
           Array.from({ length: Math.ceil((months.length - 1) / 2) }, (_, pageIndex) => {
             const monthsInPage = months.slice(1 + pageIndex * 2, 1 + (pageIndex + 1) * 2)
