@@ -16,7 +16,7 @@ interface UnifiedCalendarSettingsProps {
 }
 
 export function UnifiedCalendarSettings({ personalCustomDays, loading, selectedYear }: UnifiedCalendarSettingsProps) {
-  // 載入所有全局設定
+  // 載入所有日曆設定
   const allCustomDays = useMemo(() => {
     const days = loadAllCustomDays()
     console.log('🔄 UnifiedCalendarSettings: 載入日曆設定', days.length, '項')

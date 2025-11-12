@@ -2,9 +2,9 @@ import { format, parseISO, addDays, isWeekend, differenceInMinutes, isAfter, isB
 import { CustomDayWithId, DayStatus } from '../types/workday'
 import { DEFAULT_CALENDAR_SETTINGS } from '../data/default-calendar'
 
-// 載入全局自訂日期設定
+// 載入自訂日期設定
 export const loadCustomDaysFromStorage = (): CustomDayWithId[] => {
-  const saved = localStorage.getItem('workday-global-settings')
+  const saved = localStorage.getItem('workday-custom-settings')
   if (saved) {
     try {
       const localData = JSON.parse(saved)
@@ -27,10 +27,10 @@ export const loadCustomDaysFromStorage = (): CustomDayWithId[] => {
 }
 
 export const saveCustomDaysToStorage = (customDays: CustomDayWithId[]): void => {
-  localStorage.setItem('workday-global-settings', JSON.stringify(customDays))
+  localStorage.setItem('workday-custom-settings', JSON.stringify(customDays))
 }
 
-// 載入全局自訂日期設定（包含預設設定和個人設定的合併）
+// 載入所有自訂日期設定（包含預設設定和個人設定的合併）
 export const loadAllCustomDays = (): CustomDayWithId[] => {
   const personalSettings = loadCustomDaysFromStorage()
   
@@ -405,10 +405,11 @@ export const calculateEndDateFromDays = (
   startDate: string,
   days: number,
   isWorkdays: boolean,
-  customDays: CustomDayWithId[]
+  customDays: CustomDayWithId[],
+  includeStartDate: boolean = true
 ): string => {
   const start = parseISO(startDate)
-  let currentDate = start
+  let currentDate = includeStartDate ? start : addDays(start, 1)
   let count = 0
   
   if (isWorkdays) {
@@ -416,14 +417,16 @@ export const calculateEndDateFromDays = (
     while (count < days) {
       if (isWorkdayDate(currentDate, customDays)) {
         count++
-      }
-      if (count < days) {
+        if (count < days) {
+          currentDate = addDays(currentDate, 1)
+        }
+      } else {
         currentDate = addDays(currentDate, 1)
       }
     }
   } else {
     // 計算日曆日
-    currentDate = addDays(start, days - 1)
+    currentDate = addDays(currentDate, days - 1)
   }
   
   return format(currentDate, 'yyyy-MM-dd')
