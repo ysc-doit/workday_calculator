@@ -46,6 +46,8 @@ export function WorkdayCalendar({ calculationRange, calculationDetails, selected
   const [customDays, setCustomDays] = useState<CustomDayWithId[]>([])
   const [showSettings, setShowSettings] = useState(false)
   const [selectedYear, setSelectedYear] = useState<string>('')
+  const [showYearPicker, setShowYearPicker] = useState(false)
+  const [showMonthPicker, setShowMonthPicker] = useState(false)
 
   // 調試日誌
   useEffect(() => {
@@ -85,6 +87,23 @@ export function WorkdayCalendar({ calculationRange, calculationDetails, selected
   useEffect(() => {
     loadCustomDays()
   }, [])
+
+  // 點擊外部關閉選擇器
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showYearPicker || showMonthPicker) {
+        setShowYearPicker(false)
+        setShowMonthPicker(false)
+      }
+    }
+
+    if (showYearPicker || showMonthPicker) {
+      document.addEventListener('click', handleClickOutside)
+      return () => {
+        document.removeEventListener('click', handleClickOutside)
+      }
+    }
+  }, [showYearPicker, showMonthPicker])
 
   // 當計算範圍變化時，自動跳轉到開始日期的月份
   useEffect(() => {
@@ -293,8 +312,8 @@ export function WorkdayCalendar({ calculationRange, calculationDetails, selected
   const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 
   return (
-    <Card className="flex flex-col h-full">
-      <CardHeader>
+    <Card className="flex flex-col h-full md:border md:rounded-lg md:shadow md:bg-card border-0 rounded-none shadow-none bg-transparent">
+      <CardHeader className="md:px-6 md:pt-6 md:pb-0 px-[21px] pt-[21px] pb-0 py-[0px]">
         <CardTitle className="flex items-center justify-between">
           {/* 左側回到今天按鈕 */}
           <div>
@@ -312,52 +331,109 @@ export function WorkdayCalendar({ calculationRange, calculationDetails, selected
 
           {/* 中央標題或年份月份控制 */}
           {!showSettings ? (
-            <div className="flex items-center gap-3">
-              {/* 年份控制 */}
+            <div className="flex items-center gap-2 relative" onClick={(e) => e.stopPropagation()}>
+              {/* 左箭頭按鈕 */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleMonthChange('prev')}
+                title="上個月"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+
+              {/* 年份和月份按鈕 */}
               <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleYearChange('prev')}
-                  title="上一年"
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowYearPicker(!showYearPicker)
+                    setShowMonthPicker(false)
+                  }}
+                  className="px-3 py-1.5 rounded-md hover:bg-accent cursor-pointer transition-colors"
                 >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <span className="min-w-16 text-center">
-                  {format(currentDate, 'yyyy年', { locale: zhTW })}
+                  {format(currentDate, 'yyyy')}
                 </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleYearChange('next')}
-                  title="下一年"
+                <span className="text-muted-foreground">/</span>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowMonthPicker(!showMonthPicker)
+                    setShowYearPicker(false)
+                  }}
+                  className="px-3 py-1.5 rounded-md hover:bg-accent cursor-pointer transition-colors"
                 >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
+                  {format(currentDate, 'M')}
+                </span>
               </div>
 
-              {/* 月份控制 */}
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleMonthChange('prev')}
-                  title="上個月"
+              {/* 右箭頭按鈕 */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleMonthChange('next')}
+                title="下個月"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+
+              {/* 年份選擇器彈出層 */}
+              {showYearPicker && (
+                <div 
+                  className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-popover border rounded-md shadow-lg z-50 p-2 grid grid-cols-4 gap-1 w-64"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <span className="min-w-12 text-center">
-                  {format(currentDate, 'MM月', { locale: zhTW })}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleMonthChange('next')}
-                  title="下個月"
+                  {Array.from({ length: 21 }, (_, i) => {
+                    const year = currentDate.getFullYear() - 10 + i
+                    return (
+                      <Button
+                        key={year}
+                        variant={year === currentDate.getFullYear() ? "default" : "ghost"}
+                        size="sm"
+                        className="h-8"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const newDate = new Date(currentDate)
+                          newDate.setFullYear(year)
+                          setCurrentDate(newDate)
+                          setShowYearPicker(false)
+                        }}
+                      >
+                        {year}
+                      </Button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* 月份選擇器彈出層 */}
+              {showMonthPicker && (
+                <div 
+                  className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-popover border rounded-md shadow-lg z-50 p-2 grid grid-cols-4 gap-1 w-48"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const month = i + 1
+                    return (
+                      <Button
+                        key={month}
+                        variant={month === currentDate.getMonth() + 1 ? "default" : "ghost"}
+                        size="sm"
+                        className="h-8"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const newDate = new Date(currentDate)
+                          newDate.setMonth(i)
+                          setCurrentDate(newDate)
+                          setShowMonthPicker(false)
+                        }}
+                      >
+                        {month}月
+                      </Button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           ) : (
             // 設定模式下的年份選擇器
@@ -439,7 +515,7 @@ export function WorkdayCalendar({ calculationRange, calculationDetails, selected
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col">
+      <CardContent className="flex-1 flex flex-col md:px-6 md:pb-6 px-4 pb-4">
         {showSettings ? (
           /* 工作日曆設定管理內容 */
           <div className="h-[450px] overflow-y-auto pr-2">
