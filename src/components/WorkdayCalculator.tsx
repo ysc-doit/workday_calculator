@@ -25,7 +25,6 @@ import {
   formatWorkTime,
   WorkdayCalculationDetails
 } from '../utils/workday-helpers'
-import { DirectMergeButton } from './DirectMergeButton'
 
 import { CustomDayForm } from './CustomDayForm'
 import { WorkdayCalculationDetailsComponent } from './WorkdayCalculationDetails'
@@ -104,17 +103,10 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
   }
 
   const loadCustomDays = useCallback(() => {
-    // 載入全局自訂日期設定
     try {
       const allDays = loadAllCustomDays()
-      
       setCustomDays(allDays)
-      
-      if (allDays.length > 0) {
-        console.log(`📅 已載入 ${allDays.length} 個日期設定`)
-      }
     } catch (error) {
-      console.error('載入自訂設定失敗:', error)
       setCustomDays([])
     }
   }, [])
@@ -176,12 +168,9 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
           try {
             startDateInputRef.current.focus()
             startDateInputRef.current.select()
-            console.log('開始日期輸入框已聚焦')
           } catch (error) {
-            console.log('聚焦失敗:', error)
+            // 靜默處理錯誤
           }
-        } else {
-          console.log('開始日期輸入框 ref 不存在')
         }
       }
       
@@ -200,12 +189,9 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
           try {
             endDateInputRef.current.focus()
             endDateInputRef.current.select()
-            console.log('結束日期輸框已聚焦')
           } catch (error) {
-            console.log('聚焦失敗:', error)
+            // 靜默處理錯誤
           }
-        } else {
-          console.log('結束日期輸入框 ref 不存在')
         }
       }
       
@@ -223,12 +209,9 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
           try {
             startTimeInputRef.current.focus()
             startTimeInputRef.current.select()
-            console.log('開始時間輸入框已聚焦')
           } catch (error) {
-            console.log('聚焦失敗:', error)
+            // 靜默處理錯誤
           }
-        } else {
-          console.log('開始時間輸入框 ref 不存在')
         }
       }
       
@@ -246,12 +229,9 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
           try {
             endTimeInputRef.current.focus()
             endTimeInputRef.current.select()
-            console.log('結束時輸入聚焦')
           } catch (error) {
-            console.log('聚焦失敗:', error)
+            // 靜默處理錯誤
           }
-        } else {
-          console.log('結束時間輸入框 ref 不存在')
         }
       }
       
@@ -269,12 +249,9 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
           try {
             startDateTimeInputRef.current.focus()
             startDateTimeInputRef.current.select()
-            console.log('開始日期時間輸入框已聚焦')
           } catch (error) {
-            console.log('聚焦失敗:', error)
+            // 靜默處理錯誤
           }
-        } else {
-          console.log('開始日期時間輸入框 ref 不存在')
         }
       }
       
@@ -292,12 +269,9 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
           try {
             endDateTimeInputRef.current.focus()
             endDateTimeInputRef.current.select()
-            console.log('結束日期時間輸入框已聚焦')
           } catch (error) {
-            console.log('聚焦失敗:', error)
+            // 靜默處理錯誤
           }
-        } else {
-          console.log('結束日期時間輸入框 ref 不存在')
         }
       }
       
@@ -514,7 +488,6 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
       setNewCustomName('')
       toast.success('✅ 已儲存自訂日期')
     } catch (error) {
-      console.error('儲存自訂設定失敗:', error)
       toast.error('儲存失敗，請重試')
     } finally {
       setLoading(false)
@@ -537,7 +510,6 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
       
       toast.success('✅ 已刪除自訂日期')
     } catch (error) {
-      console.error('刪除自訂設定失敗:', error)
       toast.error('刪除失敗，請重試')
     } finally {
       setLoading(false)
@@ -686,7 +658,7 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
         setEndDateInput(formatted)
       }
     } catch (error) {
-      console.error('格式化日期失敗:', error)
+      // 靜默處理錯誤
     }
   }
 
@@ -761,7 +733,7 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
         setEndDateTimeInput(formatted)
       }
     } catch (error) {
-      console.error('格式化日期時間失敗:', error)
+      // 靜默處理錯誤
     }
   }
 
@@ -925,8 +897,6 @@ export function WorkdayCalculator({ onCalculationUpdate, onCalculationClear, onC
         setEndTimePickerOpen(false)
       }
     }
-    
-    console.log(`時間選擇: ${component} = ${value}, 結果: ${completeTime || partialTime}`) // 調試用
   }
 
   return (

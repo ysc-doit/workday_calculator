@@ -19,7 +19,6 @@ export function UnifiedCalendarSettings({ personalCustomDays, loading, selectedY
   // 載入所有日曆設定
   const allCustomDays = useMemo(() => {
     const days = loadAllCustomDays()
-    console.log('🔄 UnifiedCalendarSettings: 載入日曆設定', days.length, '項')
     return days
   }, [personalCustomDays])
   

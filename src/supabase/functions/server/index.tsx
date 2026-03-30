@@ -1,16 +1,16 @@
-// Minimal server function - no complex operations
+// Disabled - using local storage only
 export default async function handler() {
   return new Response(
     JSON.stringify({ 
-      status: 'ok',
-      message: 'Server is running',
-      timestamp: new Date().toISOString()
+      status: 'disabled',
+      message: 'Supabase integration disabled - using local storage only'
     }),
     { 
       headers: { 
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
-      } 
+      },
+      status: 200
     }
   )
 }

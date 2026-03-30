@@ -34,6 +34,23 @@ interface VersionInfo {
 
 const VERSION_HISTORY: VersionInfo[] = [
   {
+    version: "ver.2026/03/29",
+    date: "2026/03/29",
+    features: [
+      {
+        title: "工時計算模式優化",
+        items: [
+          "計算結果區塊增加計算方式說明",
+          "移除計算詳細資訊，改於日曆視圖呈現",
+          "工時改為2橫向進度條風格視覺設計",
+          "起訖時間改為紅色粗體顯示（僅在起訖日顯示）",
+          "移除工時模式下的工作日序號顯示",
+          "列印模式同步更新為新的進度條設計",
+        ],
+      },
+    ],
+  },
+  {
     version: "ver.2025/11/27",
     date: "2025/11/27",
     features: [
@@ -135,8 +152,6 @@ const VERSION_HISTORY: VersionInfo[] = [
   },
 ];
 
-const CURRENT_VERSION = VERSION_HISTORY[0];
-
 export default function App() {
   const [calculationRange, setCalculationRange] = useState<
     | {
@@ -163,7 +178,6 @@ export default function App() {
   const [inclusionMode, setInclusionMode] = useState<
     "current" | "next" | undefined
   >(undefined);
-  const [isInitialized, setIsInitialized] = useState(false);
   const [selectedVersionIndex, setSelectedVersionIndex] =
     useState(0);
   const [isVersionPopoverOpen, setIsVersionPopoverOpen] =
@@ -171,37 +185,7 @@ export default function App() {
 
   // 初始化應用
   useEffect(() => {
-    try {
-      const allCustomDays = loadAllCustomDays();
-
-      console.log(`✅ 應用已初始化`);
-      console.log(
-        `📋 載入日期設定: ${allCustomDays.length} 項`,
-      );
-      console.log(
-        "📅 預設日曆設定已載入:",
-        allCustomDays.filter(
-          (day) =>
-            day.id.includes("holiday-") ||
-            day.id.includes("workday-"),
-        ).length,
-        "項",
-      );
-      console.log(
-        "🔧 個人自訂設定:",
-        allCustomDays.filter(
-          (day) =>
-            !day.id.includes("holiday-") &&
-            !day.id.includes("workday-"),
-        ).length,
-        "項",
-      );
-
-      setIsInitialized(true);
-    } catch (error) {
-      console.error("❌ 初始化錯誤:", error);
-      setIsInitialized(true); // 即使出錯也繼續運行
-    }
+    loadAllCustomDays();
   }, []);
 
   const handleCalculationUpdate = useCallback(
@@ -226,7 +210,6 @@ export default function App() {
       setCalculationMode(mode);
       setCalculationType(type);
       setInclusionMode(inclusionMode);
-      // 自動計算時直接設置卡片類型，不使用切換邏輯
       if (cardType) {
         setSelectedCardType(cardType);
       }
@@ -244,7 +227,6 @@ export default function App() {
   }, []);
 
   const handleCardClick = useCallback((cardType: string) => {
-    // 點擊相同卡片時保持選中，不取消
     setSelectedCardType(cardType);
   }, []);
 
@@ -302,11 +284,7 @@ export default function App() {
                       <div className="text-center">
                         <p className="text-sm">
                           <span className="font-medium">
-                            版本資訊：
-                            {currentDisplayVersion.version.replace(
-                              "ver.",
-                              "",
-                            )}
+                            版本資訊：{currentDisplayVersion.version.replace("ver.", "")}
                           </span>
                         </p>
                       </div>
@@ -346,12 +324,17 @@ export default function App() {
                         </div>
                       ),
                     )}
+                    
+                    {/* Made by JH - 固定顯示在底部 */}
+                    <div className="pt-3 mt-3 border-t text-center">
+                      <p className="text-xs text-muted-foreground">Made by JH</p>
+                    </div>
                   </div>
                 </PopoverContent>
               </Popover>
               <ThemeToggle />
             </div>
-            <h1 className="text-3xl font-bold">工作天計算機</h1>
+            <h1 className="text-3xl font-bold">北市工作天計算機</h1>
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 xl:items-start">
