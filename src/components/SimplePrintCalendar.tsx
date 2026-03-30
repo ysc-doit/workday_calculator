@@ -132,7 +132,7 @@ export const generatePrintableHTML = ({
       }
       
     } catch (error) {
-      console.error('Error calculating sequence number:', error)
+      // 靜默處理錯誤
     }
     
     return null
@@ -334,15 +334,19 @@ export const generatePrintableHTML = ({
 
     const weekDayNames = ['日', '一', '二', '三', '四', '五', '六']
     
-    // 調整格子高度以充分利用A4空間
-    const cellHeight = isFullPage ? '65px' : '50px'  // 增加高度讓內容完整顯示
-    const titleSize = isFullPage ? '16px' : '14px'    // 調整標題大小
-    const dayFontSize = isFullPage ? '12px' : '11px'  // 調整日期字體
-    const sequenceFontSize = isFullPage ? '9px' : '8px'  // 調整序號字體
-    const sequenceSize = isFullPage ? '18px' : '16px'    // 調整序號圓圈大小
-    const marginBottom = isFullPage ? '20px' : '16px'    // 調整月曆間距
-    const titleMargin = isFullPage ? '10px' : '8px'       // 調整標題間距
-
+    // 根據是否全頁顯示調整尺寸
+    // isFullPage = true: 第一頁的單個月曆，使用較大尺寸
+    // isFullPage = false: 每頁2個月曆，使用緊湊尺寸
+    const cellHeight = isFullPage ? '65px' : '45px'
+    const titleSize = isFullPage ? '16px' : '13px'
+    const dayFontSize = isFullPage ? '12px' : '10px'
+    const sequenceFontSize = isFullPage ? '9px' : '8px'
+    const sequenceSize = isFullPage ? '18px' : '15px'
+    const marginBottom = isFullPage ? '20px' : '12px'
+    const titleMargin = isFullPage ? '10px' : '6px'
+    const progressBarHeight = isFullPage ? '10px' : '8px'
+    const progressBarBorder = isFullPage ? '2px' : '1.5px'
+    
     let calendarHTML = `
       <div style="margin-bottom: ${marginBottom}; page-break-inside: avoid;">
         <h3 style="text-align: center; margin: 0 0 ${titleMargin} 0; font-size: ${titleSize}; font-weight: bold;">
@@ -386,9 +390,6 @@ export const generatePrintableHTML = ({
             const isWorkHoursMode = calculationRange.startTime && calculationRange.endTime
             const dayWorkHours = isWorkHoursMode ? calculationDetails?.workingDaysDetails?.find(d => d.date === dayString) : null
             
-            const showBoundaryTime = isWorkHoursMode && ((isStartDate && calculationRange.startTime) || (isEndDate && calculationRange.endTime))
-            const boundaryTimeToShow = isStartDate ? calculationRange.startTime : calculationRange.endTime
-            
             let backgroundColor = '#ffffff'
             let borderColor = 'transparent'
             
@@ -407,12 +408,99 @@ export const generatePrintableHTML = ({
                           selectedCardType === 'workdays' ? '#22c55e' :
                           selectedCardType === 'weekends' ? '#ef4444' :
                           selectedCardType === 'customHolidays' ? '#f97316' :
-                          selectedCardType === 'workHours' ? '#a855f7' :
+                          selectedCardType === 'workHours' ? '#3b82f6' :
                           '#22c55e'
             }
 
             const displayName = dayStatus.name ? 
               (dayStatus.name.length > 4 ? dayStatus.name.substring(0, 4) + '..' : dayStatus.name) : ''
+
+            // 生成進度條HTML的函數
+            const generateProgressBarsHTML = () => {
+              if (!dayWorkHours || !dayWorkHours.periods) return ''
+              
+              const periods = [
+                {
+                  label: '上午',
+                  slots: [
+                    { start: '08:30', end: '09:30' },
+                    { start: '09:30', end: '10:30' },
+                    { start: '10:30', end: '11:30' },
+                    { start: '11:30', end: '12:30' }
+                  ]
+                },
+                {
+                  label: '下午',
+                  slots: [
+                    { start: '13:30', end: '14:30' },
+                    { start: '14:30', end: '15:30' },
+                    { start: '15:30', end: '16:30' },
+                    { start: '16:30', end: '17:30' }
+                  ]
+                }
+              ]
+              
+              const timeToMinutes = (time: string) => {
+                const [h, m] = time.split(':').map(Number)
+                return h * 60 + m
+              }
+              
+              const calculateSlotPercentage = (slot: { start: string; end: string }) => {
+                const slotStart = timeToMinutes(slot.start)
+                const slotEnd = timeToMinutes(slot.end)
+                const slotDuration = slotEnd - slotStart
+                
+                let totalWorkMinutes = 0
+                
+                dayWorkHours.periods.forEach(period => {
+                  const periodStart = timeToMinutes(period.start)
+                  const periodEnd = timeToMinutes(period.end)
+                  
+                  const overlapStart = Math.max(slotStart, periodStart)
+                  const overlapEnd = Math.min(slotEnd, periodEnd)
+                  
+                  if (overlapStart < overlapEnd) {
+                    totalWorkMinutes += (overlapEnd - overlapStart)
+                  }
+                })
+                
+                return (totalWorkMinutes / slotDuration) * 100
+              }
+              
+              return periods.map(period => {
+                return `
+                  <div style="
+                    display: flex; 
+                    height: ${progressBarHeight}; 
+                    border: ${progressBarBorder} solid #d1d5db; 
+                    border-radius: 4px; 
+                    background-color: #f3f4f6; 
+                    overflow: hidden;
+                    margin-bottom: 2px;
+                  ">
+                    ${period.slots.map((slot, slotIndex) => {
+                      const percentage = calculateSlotPercentage(slot)
+                      return `
+                        <div style="
+                          flex: 1; 
+                          position: relative;
+                          ${slotIndex < period.slots.length - 1 ? 'border-right: 1px solid #d1d5db;' : ''}
+                        ">
+                          <div style="
+                            position: absolute;
+                            ${isStartDate ? 'right: 0;' : 'left: 0;'}
+                            top: 0;
+                            height: 100%;
+                            width: ${percentage}%;
+                            background-color: #3b82f6;
+                          "></div>
+                        </div>
+                      `
+                    }).join('')}
+                  </div>
+                `
+              }).join('')
+            }
 
             return `
               <div style="
@@ -440,7 +528,23 @@ export const generatePrintableHTML = ({
                   ">
                     ${format(day, 'd')}
                   </span>
-                  ${sequenceNumber ? `
+                  ${isWorkHoursMode && dayWorkHours && (isStartDate || isEndDate) ? `
+                    <div style="display: flex; gap: 2px; align-items: center;">
+                      ${dayWorkHours.startTime ? `
+                        <span style="font-size: ${isFullPage ? '9px' : '8px'}; color: #dc2626; font-weight: 600;">
+                          ${dayWorkHours.startTime.substring(0, 5)}
+                        </span>
+                      ` : ''}
+                      ${dayWorkHours.startTime && dayWorkHours.endTime ? `
+                        <span style="font-size: ${isFullPage ? '9px' : '8px'}; color: #dc2626; font-weight: 600;">-</span>
+                      ` : ''}
+                      ${dayWorkHours.endTime ? `
+                        <span style="font-size: ${isFullPage ? '9px' : '8px'}; color: #dc2626; font-weight: 600;">
+                          ${dayWorkHours.endTime.substring(0, 5)}
+                        </span>
+                      ` : ''}
+                    </div>
+                  ` : (!isWorkHoursMode && sequenceNumber ? `
                     <span style="
                       font-size: ${sequenceFontSize}; 
                       background-color: ${
@@ -448,7 +552,7 @@ export const generatePrintableHTML = ({
                         selectedCardType === 'workdays' ? '#22c55e' :
                         selectedCardType === 'weekends' ? '#ef4444' :
                         selectedCardType === 'customHolidays' ? '#f97316' :
-                        selectedCardType === 'workHours' ? '#a855f7' :
+                        selectedCardType === 'workHours' ? '#3b82f6' :
                         '#22c55e'
                       }; 
                       color: white; 
@@ -462,36 +566,23 @@ export const generatePrintableHTML = ({
                     ">
                       ${sequenceNumber}
                     </span>
-                  ` : ''}
+                  ` : '')}
                 </div>
                 
-                ${showBoundaryTime && boundaryTimeToShow ? `
-                  <div style="margin-bottom: ${isFullPage ? '3px' : '2px'};">
-                    <span style="
-                      font-size: ${isFullPage ? '10px' : '8px'}; 
-                      background-color: #ef4444; 
-                      color: white; 
-                      padding: ${isFullPage ? '3px 5px' : '2px 3px'}; 
-                      border-radius: 3px;
-                      font-weight: 500;
-                    ">
-                      ${boundaryTimeToShow.substring(0, 5)}
-                    </span>
+                ${isWorkHoursMode && dayWorkHours ? `
+                  <div style="flex: 1; display: flex; flex-direction: column; gap: 1px; padding: 0 2px;">
+                    ${generateProgressBarsHTML()}
                   </div>
-                ` : ''}
-                
-                ${dayWorkHours && (dayWorkHours.hours > 0 || dayWorkHours.minutes > 0) ? `
-                  <div style="margin-bottom: ${isFullPage ? '3px' : '2px'};">
-                    <span style="
-                      font-size: ${isFullPage ? '10px' : '8px'}; 
-                      background-color: #a855f7; 
-                      color: white; 
-                      padding: ${isFullPage ? '3px 5px' : '2px 3px'}; 
-                      border-radius: 3px;
-                      font-weight: 500;
-                    ">
-                      ${dayWorkHours.hours > 0 ? `${dayWorkHours.hours}h` : ''}${dayWorkHours.minutes > 0 ? `${dayWorkHours.minutes}m` : ''}
-                    </span>
+                  <div style="text-align: center; margin-top: 2px;">
+                    ${(dayWorkHours.hours > 0 || dayWorkHours.minutes > 0) ? `
+                      <span style="
+                        font-size: ${isFullPage ? '9px' : '8px'}; 
+                        color: #2563eb; 
+                        font-weight: 500;
+                      ">
+                        ${dayWorkHours.hours > 0 ? `${dayWorkHours.hours}h` : ''}${dayWorkHours.minutes > 0 ? `${dayWorkHours.minutes}m` : ''}
+                      </span>
+                    ` : ''}
                   </div>
                 ` : ''}
                 
@@ -523,7 +614,7 @@ export const generatePrintableHTML = ({
     <!DOCTYPE html>
     <html>
       <head>
-        <title>工作天計算機</title>
+        <title>北市工作天計算機</title>
         <meta charset="utf-8">
         <style>
           @media print {
@@ -563,7 +654,7 @@ export const generatePrintableHTML = ({
           <!-- 標題 -->
           <div style="text-align: center; margin-bottom: 32px;">
             <h1 style="font-size: 24px; font-weight: bold; margin: 0; color: #1f2937;">
-              工作天計算機
+              北市工作天計算機
             </h1>
           </div>
 
@@ -589,7 +680,7 @@ export const generatePrintableHTML = ({
             const monthsInPage = months.slice(1 + pageIndex * 2, 1 + (pageIndex + 1) * 2)
             return `
               <div class="page-break">
-                ${monthsInPage.map(month => generateCalendarHTML(month, true)).join('')}
+                ${monthsInPage.map(month => generateCalendarHTML(month, false)).join('')}
               </div>
             `
           }).join('') 
